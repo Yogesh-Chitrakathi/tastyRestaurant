@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -27,9 +28,12 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
   final pincode = TextEditingController();
   final landmark = TextEditingController();
   final locationController = TextEditingController();
+  final latitudeController = TextEditingController();
+  final longitudeController = TextEditingController();
 
   bool showPass = true;
   bool showConfirm = true;
+  bool isLocationLoading = false;
 
   String gender = "Male";
   bool useForDelivery = false;
@@ -77,52 +81,136 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
   }
 
   void showMsg(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// ================= LOCATION =================
   Future<void> getCurrentLocation() async {
+    setState(() => isLocationLoading = true);
+
     try {
+      // 1. Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        showMsg("Enable Location Service");
+        showMsg("Please enable location services in your device settings.");
+        setState(() => isLocationLoading = false);
         return;
       }
 
+      // 2. Check and handle location permission states
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          showMsg("Location permission denied. Please allow location access to auto-fill address.");
+          setState(() => isLocationLoading = false);
+          return;
+        }
       }
 
+      if (permission == LocationPermission.deniedForever) {
+        // Redirect permanently denied users to settings
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Location Permission Required"),
+            content: const Text(
+              "Location permissions are permanently denied. Please enable them in your device settings to use this feature.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await Geolocator.openAppSettings();
+                },
+                child: const Text("Open Settings"),
+              ),
+            ],
+          ),
+        );
+        setState(() => isLocationLoading = false);
+        return;
+      }
+
+      // 3. Fetch GPS coordinates with timeout
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-      );
+      ).timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException("GPS coordinates fetch timed out. Please try again in an open space.");
+      });
 
       lat = position.latitude;
       lng = position.longitude;
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat!, lng!);
+      // 4. Reverse Geocoding with fallback
+      List<Placemark> placemarks;
+      try {
+        placemarks = await placemarkFromCoordinates(lat!, lng!).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException("Reverse geocoding timed out. Check your internet connection."),
+        );
+      } catch (geocodingError) {
+        // If geocoding fails (e.g. no internet), we still populate the coordinates!
+        setState(() {
+          latitudeController.text = lat!.toString();
+          longitudeController.text = lng!.toString();
+          locationText = "Coords: $lat, $lng (Address resolve failed)";
+          locationController.text = "Coords: $lat, $lng";
+        });
+        showMsg("Could not resolve address details. Latitude and Longitude auto-filled. You can manually enter your address.");
+        setState(() => isLocationLoading = false);
+        return;
+      }
 
-      Placemark place = placemarks.first;
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
 
-      String fullAddress =
-          "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.postalCode}, ${place.country}";
+        String fullAddress = "";
+        List<String> addressParts = [];
+        if (place.street != null && place.street!.isNotEmpty) addressParts.add(place.street!);
+        if (place.subLocality != null && place.subLocality!.isNotEmpty) addressParts.add(place.subLocality!);
+        if (place.locality != null && place.locality!.isNotEmpty) addressParts.add(place.locality!);
+        if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) addressParts.add(place.administrativeArea!);
+        if (place.postalCode != null && place.postalCode!.isNotEmpty) addressParts.add(place.postalCode!);
+        if (place.country != null && place.country!.isNotEmpty) addressParts.add(place.country!);
+        fullAddress = addressParts.join(", ");
 
-      setState(() {
-        locationText = fullAddress;
-        locationController.text = fullAddress;
-        
-        // Auto-fill individual address fields
-        house.text = place.name ?? "";
-        street.text = place.thoroughfare ?? "";
-        area.text = place.subLocality ?? "";
-        city.text = place.locality ?? "";
-        stateName.text = place.administrativeArea ?? "";
-        pincode.text = place.postalCode ?? "";
-        landmark.text = place.subThoroughfare ?? "";
-      });
+        setState(() {
+          locationText = fullAddress;
+          locationController.text = fullAddress;
+          
+          latitudeController.text = lat!.toString();
+          longitudeController.text = lng!.toString();
+
+          // Auto-fill individual address fields
+          house.text = place.name ?? "";
+          street.text = place.thoroughfare ?? "";
+          area.text = place.subLocality ?? "";
+          city.text = place.locality ?? "";
+          stateName.text = place.administrativeArea ?? "";
+          pincode.text = place.postalCode ?? "";
+          landmark.text = place.subThoroughfare ?? "";
+        });
+        showMsg("Address auto-filled successfully! 🎉");
+      } else {
+        showMsg("No address data returned from GPS. Coordinates loaded.");
+        setState(() {
+          latitudeController.text = lat!.toString();
+          longitudeController.text = lng!.toString();
+        });
+      }
+    } on TimeoutException catch (te) {
+      showMsg(te.message ?? "Request timed out. Please try again.");
     } catch (e) {
-      showMsg("Location error");
+      showMsg("Failed to fetch location. Please check your internet/GPS connection and try again.");
+    } finally {
+      setState(() => isLocationLoading = false);
     }
   }
 
@@ -170,12 +258,15 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
           "pincode": pincode.text.trim(),
           "landmark": landmark.text.trim(),
           "liveLocation": locationController.text.trim(),
+          "latitude": latitudeController.text.trim(),
+          "longitude": longitudeController.text.trim(),
         },
         "useForDelivery": useForDelivery,
         "createdAt": DateTime.now(),
       });
 
       /// ✅ SUCCESS
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Registration Successful 🎉"),
@@ -308,19 +399,32 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
             field("State", stateName),
             field("Pincode", pincode),
             field("Landmark", landmark),
+            field("Latitude", latitudeController),
+            field("Longitude", longitudeController),
 
             /// LOCATION
             const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: getCurrentLocation,
-              icon: const Icon(Icons.my_location),
-              label: const Text("Get Live Location"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange,
-              ),
-            ),
+            isLocationLoading
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: CircularProgressIndicator(color: Colors.deepOrange),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: getCurrentLocation,
+                    icon: const Icon(Icons.my_location),
+                    label: const Text("Get Live Location"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
 
-            Text(locationText),
+            const SizedBox(height: 5),
+            Text(
+              locationText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
 
             CheckboxListTile(
               title: const Text("Use for delivery"),
