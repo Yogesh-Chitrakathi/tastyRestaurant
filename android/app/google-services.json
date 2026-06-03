@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "448873934281",
+    "project_id": "tasty-project-2",
+    "storage_bucket": "tasty-project-2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:448873934281:android:e1b9b118593d0be8f7cc18",
+        "android_client_info": {
+          "package_name": "com.example.tasty_restaurant_2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqx-zsO8Ad9gSeztY42olUp8k6PTS6IMc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

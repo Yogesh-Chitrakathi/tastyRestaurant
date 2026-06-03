@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "YOUR_APPLE_DEVELOPER_TEAM_ID.com.example.tastyRestaurant2",
+        "paths": [
+          "/app/*"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opening Tasty Restaurant...</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #FF9900 0%, #FF5E3A 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 90%;
+        }
+        .logo {
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: white;
+            color: #FF5E3A;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍔</div>
+        <h1>Opening Tasty Restaurant...</h1>
+        <p>Attempting to open the product in the app. If it doesn't open automatically, click the button below or we will redirect you to the store.</p>
+        <a id="app-link" class="btn" href="#">Open in App</a>
+        <div class="loader"></div>
+    </div>
+
+    <script>
+        // Extract product ID from query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const productId = urlParams.get('id') || '';
+
+        // App custom scheme URL
+        const appUri = 'tastyrestaurant://product?id=' + productId;
+        
+        // Fallback website URL (Requested: https://devnectar.in/)
+        const fallbackUrl = 'https://devnectar.in/';
+        
+        // Android Intent URL for robust app launch and automatic store/fallback redirect
+        const androidIntentUri = 'intent://product?id=' + productId + '#Intent;scheme=tastyrestaurant;package=com.example.tastyRestaurant2;S.browser_fallback_url=' + encodeURIComponent(fallbackUrl) + ';end';
+
+        // Update button href
+        document.getElementById('app-link').href = appUri;
+
+        // Detect OS and attempt redirect
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        
+        if (/android/i.test(userAgent)) {
+            // Android: Use Intent URL to handle both open and fallback automatically
+            window.location.href = androidIntentUri;
+        } else {
+            // iOS/Other: Try custom scheme first
+            window.location.href = appUri;
+
+            // Fallback timeout to redirect to the website if app is not installed
+            const start = Date.now();
+            setTimeout(function() {
+                // Check if page is still in focus (app didn't open)
+                if (Date.now() - start < 2000 && !document.hidden && !document.webkitHidden) {
+                    window.location.href = fallbackUrl;
+                }
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
