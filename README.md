@@ -30,13 +30,22 @@ lib/
 ├── main.dart                      # App entry point, Firebase initialization & Auth listener
 ├── firebase_options.dart          # Automated Firebase configuration options
 │
+├── core/
+│   └── utils/
+│       └── location_service.dart  # Decoupled Location & Geocoding handler service
+│
 └── screens/
-    ├── splash_screen.dart         # Clean splash screen for app branding
-    ├── login_screen.dart          # Secure login & reset password sheet
-    ├── registration_screen.dart   # Profile creation & geolocation-assisted address setup
-    ├── home_screen.dart           # Food feed, search, category filters, and deep-link listener
-    ├── food_detail_screen.dart    # Detailed product display, sharing button & cart addition
-    └── cart_screen.dart           # Checkout queue, billing breakdown, and Firestore order creation
+    ├── splash/
+    │   └── splash_screen.dart     # Clean splash screen for app branding
+    ├── auth/
+    │   ├── login_screen.dart      # Secure login & reset password sheet
+    │   └── registration_screen.dart # Profile creation & geolocation-assisted address setup
+    ├── home/
+    │   └── home_screen.dart       # Food feed, search, category filters, and deep-link listener
+    ├── food/
+    │   └── food_detail_screen.dart # Detailed product display, sharing button & cart addition
+    └── cart/
+        └── cart_screen.dart       # Checkout queue, billing breakdown, and Firestore order creation
 ```
 
 ---

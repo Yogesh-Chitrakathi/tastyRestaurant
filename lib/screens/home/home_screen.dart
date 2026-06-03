@@ -4,9 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:app_links/app_links.dart';
-import 'login_screen.dart';
-import 'food_detail_screen.dart';
-import 'cart_screen.dart';
+import '../auth/login_screen.dart';
+import '../food/food_detail_screen.dart';
+import '../cart/cart_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

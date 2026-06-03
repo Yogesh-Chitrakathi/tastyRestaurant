@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import '../../core/utils/location_service.dart';
 
 class RestaurantRegisterScreen extends StatefulWidget {
   const RestaurantRegisterScreen({super.key});
@@ -89,106 +88,22 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
   Future<void> getCurrentLocation() async {
     setState(() => isLocationLoading = true);
 
-    try {
-      // 1. Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        showMsg("Please enable location services in your device settings.");
-        setState(() => isLocationLoading = false);
-        return;
-      }
+    final result = await LocationService.getCurrentLocation(
+      context,
+      showMessage: showMsg,
+    );
 
-      // 2. Check and handle location permission states
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          showMsg("Location permission denied. Please allow location access to auto-fill address.");
-          setState(() => isLocationLoading = false);
-          return;
-        }
-      }
+    if (result != null) {
+      setState(() {
+        lat = result.latitude;
+        lng = result.longitude;
+        locationText = result.fullAddress;
+        locationController.text = result.fullAddress;
+        latitudeController.text = result.latitude.toString();
+        longitudeController.text = result.longitude.toString();
 
-      if (permission == LocationPermission.deniedForever) {
-        // Redirect permanently denied users to settings
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Location Permission Required"),
-            content: const Text(
-              "Location permissions are permanently denied. Please enable them in your device settings to use this feature.",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await Geolocator.openAppSettings();
-                },
-                child: const Text("Open Settings"),
-              ),
-            ],
-          ),
-        );
-        setState(() => isLocationLoading = false);
-        return;
-      }
-
-      // 3. Fetch GPS coordinates with timeout
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException("GPS coordinates fetch timed out. Please try again in an open space.");
-      });
-
-      lat = position.latitude;
-      lng = position.longitude;
-
-      // 4. Reverse Geocoding with fallback
-      List<Placemark> placemarks;
-      try {
-        placemarks = await placemarkFromCoordinates(lat!, lng!).timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => throw TimeoutException("Reverse geocoding timed out. Check your internet connection."),
-        );
-      } catch (geocodingError) {
-        // If geocoding fails (e.g. no internet), we still populate the coordinates!
-        setState(() {
-          latitudeController.text = lat!.toString();
-          longitudeController.text = lng!.toString();
-          locationText = "Coords: $lat, $lng (Address resolve failed)";
-          locationController.text = "Coords: $lat, $lng";
-        });
-        showMsg("Could not resolve address details. Latitude and Longitude auto-filled. You can manually enter your address.");
-        setState(() => isLocationLoading = false);
-        return;
-      }
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-
-        String fullAddress = "";
-        List<String> addressParts = [];
-        if (place.street != null && place.street!.isNotEmpty) addressParts.add(place.street!);
-        if (place.subLocality != null && place.subLocality!.isNotEmpty) addressParts.add(place.subLocality!);
-        if (place.locality != null && place.locality!.isNotEmpty) addressParts.add(place.locality!);
-        if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) addressParts.add(place.administrativeArea!);
-        if (place.postalCode != null && place.postalCode!.isNotEmpty) addressParts.add(place.postalCode!);
-        if (place.country != null && place.country!.isNotEmpty) addressParts.add(place.country!);
-        fullAddress = addressParts.join(", ");
-
-        setState(() {
-          locationText = fullAddress;
-          locationController.text = fullAddress;
-          
-          latitudeController.text = lat!.toString();
-          longitudeController.text = lng!.toString();
-
-          // Auto-fill individual address fields
+        if (result.placemark != null) {
+          final place = result.placemark!;
           house.text = place.name ?? "";
           street.text = place.thoroughfare ?? "";
           area.text = place.subLocality ?? "";
@@ -196,22 +111,16 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
           stateName.text = place.administrativeArea ?? "";
           pincode.text = place.postalCode ?? "";
           landmark.text = place.subThoroughfare ?? "";
-        });
-        showMsg("Address auto-filled successfully! 🎉");
+        }
+      });
+      if (result.errorMessage != null) {
+        showMsg(result.errorMessage!);
       } else {
-        showMsg("No address data returned from GPS. Coordinates loaded.");
-        setState(() {
-          latitudeController.text = lat!.toString();
-          longitudeController.text = lng!.toString();
-        });
+        showMsg("Address auto-filled successfully! 🎉");
       }
-    } on TimeoutException catch (te) {
-      showMsg(te.message ?? "Request timed out. Please try again.");
-    } catch (e) {
-      showMsg("Failed to fetch location. Please check your internet/GPS connection and try again.");
-    } finally {
-      setState(() => isLocationLoading = false);
     }
+
+    setState(() => isLocationLoading = false);
   }
 
   /// ================= REGISTER =================
