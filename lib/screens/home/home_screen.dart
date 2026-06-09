@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:app_links/app_links.dart';
-import '../auth/login_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/cart_provider.dart';
 import '../food/food_detail_screen.dart';
 import '../cart/cart_screen.dart';
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +18,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String selectedCategory = "All";
-  List cart = [];
   String searchQuery = "";
   final TextEditingController searchController = TextEditingController();
 
@@ -64,28 +64,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (productId != null && productId.isNotEmpty) {
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection("foods")
-            .doc(productId)
-            .get();
-        if (doc.exists && mounted) {
-          final data = doc.data() as Map<String, dynamic>;
-          final foodData = {
-            ...data,
-            'id': doc.id,
-          };
-
+        final response = await Supabase.instance.client
+            .from('foods')
+            .select()
+            .eq('id', productId)
+            .maybeSingle();
+        if (response != null && mounted) {
           // Navigate to detail screen
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => FoodDetailScreen(data: foodData),
+              builder: (_) => FoodDetailScreen(data: response),
             ),
           );
           return;
         }
       } catch (e) {
-        debugPrint("Error fetching deep linked product: $e");
+        debugPrint("Error fetching deep linked product from Supabase: $e");
       }
     }
     
@@ -106,24 +101,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkAndSeedFoods() async {
     try {
-      debugPrint("--- Starting check and seed foods ---");
-      final snapshot = await FirebaseFirestore.instance
-          .collection("foods")
-          .limit(1)
-          .get();
-      debugPrint("Firestore snapshot docs length: ${snapshot.docs.length}");
-      if (snapshot.docs.isEmpty) {
-        debugPrint("Foods collection is empty. Seeding local foods...");
+      debugPrint("--- Starting check and seed foods in Supabase ---");
+      final response = await Supabase.instance.client
+          .from('foods')
+          .select()
+          .limit(1);
+      debugPrint("Supabase query response length: ${response.length}");
+      if (response.isEmpty) {
+        debugPrint("Foods table in Supabase is empty. Seeding local foods...");
         for (var food in localFoods) {
-          final ref = await FirebaseFirestore.instance.collection("foods").add(food);
-          debugPrint("Added food item: ${food['name']} with ID: ${ref.id}");
+          await Supabase.instance.client.from('foods').upsert(food, onConflict: 'name');
+          debugPrint("Upserted food item to Supabase: ${food['name']}");
         }
-        debugPrint("Finished seeding local foods successfully.");
+        debugPrint("Finished seeding local foods in Supabase successfully.");
       } else {
-        debugPrint("Foods collection is NOT empty. Seeding skipped.");
+        debugPrint("Foods table in Supabase is NOT empty. Seeding skipped.");
       }
     } catch (e) {
-      debugPrint("Error seeding database: $e");
+      debugPrint("Error seeding Supabase database: $e");
     }
   }
 
@@ -163,14 +158,6 @@ class _HomeScreenState extends State<HomeScreen> {
           "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=500",
     },
     {
-      "name": "Peri Peri French Fries",
-      "price": "99",
-      "category": "Snacks",
-      "rating": "4.1",
-      "image":
-          "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?q=80&w=500",
-    },
-    {
       "name": "Hyderabadi Chicken Biryani",
       "price": "249",
       "category": "Biryani",
@@ -179,52 +166,60 @@ class _HomeScreenState extends State<HomeScreen> {
           "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=500",
     },
     {
-      "name": "Diet Coca Cola",
-      "price": "49",
-      "category": "Drinks",
-      "rating": "4.0",
-      "image":
-          "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=500",
-    },
-    {
-      "name": "Crunchy Chicken Burger",
-      "price": "179",
-      "category": "Burger",
-      "rating": "4.4",
-      "image":
-          "https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?q=80&w=500",
-    },
-    {
-      "name": "Classic Pepperoni Pizza",
-      "price": "399",
-      "category": "Pizza",
-      "rating": "4.6",
-      "image":
-          "https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=500",
-    },
-    {
-      "name": "Paneer Tikka Kathi Roll",
-      "price": "129",
-      "category": "Snacks",
-      "rating": "4.2",
-      "image":
-          "https://images.unsplash.com/photo-1626700051175-6518c4793f4f?q=80&w=500",
-    },
-    {
-      "name": "Special Veg Dum Biryani",
-      "price": "199",
-      "category": "Biryani",
-      "rating": "4.3",
-      "image":
-          "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?q=80&w=500",
-    },
-    {
       "name": "Premium Cold Coffee",
       "price": "79",
       "category": "Drinks",
       "rating": "4.5",
       "image":
           "https://images.unsplash.com/photo-1517701604599-bb29b565090c?q=80&w=500",
+    },
+    {
+      "name": "Maharaja Mac Burger",
+      "price": "199",
+      "category": "Burger",
+      "rating": "4.6",
+      "image":
+          "https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=500",
+    },
+    {
+      "name": "Spicy Paneer Pizza",
+      "price": "349",
+      "category": "Pizza",
+      "rating": "4.4",
+      "image":
+          "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?q=80&w=500",
+    },
+    {
+      "name": "Loaded Cheesy Nachos",
+      "price": "129",
+      "category": "Snacks",
+      "rating": "4.2",
+      "image":
+          "https://images.unsplash.com/photo-1513456852971-30c0b8199d4d?q=80&w=500",
+    },
+    {
+      "name": "Garlic Breadsticks",
+      "price": "89",
+      "category": "Snacks",
+      "rating": "4.1",
+      "image":
+          "https://images.unsplash.com/photo-1544982503-9f984c14501a?q=80&w=500",
+    },
+    {
+      "name": "Mutton Dum Biryani",
+      "price": "329",
+      "category": "Biryani",
+      "rating": "4.7",
+      "image":
+          "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=500",
+    },
+    {
+      "name": "Mango Lassi",
+      "price": "59",
+      "category": "Drinks",
+      "rating": "4.3",
+      "image":
+          "https://images.unsplash.com/photo-1546173152-3160becbd147?q=80&w=500",
     },
   ];
 
@@ -256,12 +251,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacement(
+            icon: const Icon(Icons.person, color: Colors.black),
+            onPressed: () {
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
               );
             },
           ),
@@ -271,41 +265,41 @@ class _HomeScreenState extends State<HomeScreen> {
       // ✅ CART BUTTON (Floating Action Button Fixed)
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.orange,
-        onPressed: () async {
-          final updatedCart = await Navigator.push(
+        onPressed: () {
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => CartScreen(cartItems: cart),
+              builder: (_) => const CartScreen(),
             ),
           );
-          if (updatedCart != null && updatedCart is List) {
-            setState(() {
-              cart = updatedCart;
-            });
-          }
         },
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            const Icon(Icons.shopping_cart, color: Colors.white),
-            if (cart.isNotEmpty)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: CircleAvatar(
-                  radius: 8,
-                  backgroundColor: Colors.red,
-                  child: Text(
-                    "${cart.length}",
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+        child: Consumer<CartProvider>(
+          builder: (context, cartProvider, child) {
+            final count = cartProvider.itemCount;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(Icons.shopping_cart, color: Colors.white),
+                if (count > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: CircleAvatar(
+                      radius: 8,
+                      backgroundColor: Colors.red,
+                      child: Text(
+                        "$count",
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            );
+          },
         ),
       ),
 
@@ -407,8 +401,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
 
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection("foods").snapshots(),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: Supabase.instance.client.from('foods').stream(primaryKey: ['id']),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   debugPrint("StreamBuilder connection state is waiting...");
@@ -418,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   debugPrint("StreamBuilder Error: ${snapshot.error}");
                   return Center(child: Text("Error loading food items: ${snapshot.error}"));
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   debugPrint("StreamBuilder has no data or docs are empty.");
                   return Center(
                     child: Column(
@@ -428,12 +422,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 15),
                         ElevatedButton.icon(
                           onPressed: () async {
-                            for (var food in localFoods) {
-                              await FirebaseFirestore.instance.collection("foods").add(food);
+                            try {
+                              for (var food in localFoods) {
+                                await Supabase.instance.client.from('foods').upsert(food, onConflict: 'name');
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Demo foods seeded successfully! ✅")),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Failed to seed: $e")),
+                              );
                             }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Demo foods seeded successfully! ✅")),
-                            );
                           },
                           icon: const Icon(Icons.download),
                           label: const Text("Seed Demo Foods"),
@@ -447,14 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 }
 
-                final docs = snapshot.data!.docs;
-                final foodsList = docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return {
-                    ...data,
-                    'id': doc.id,
-                  };
-                }).toList();
+                final foodsList = snapshot.data!;
 
                 // Live filtering based on selected category & search query
                 var filteredFoods = foodsList.where((item) {
@@ -484,25 +477,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     var data = filteredFoods[index];
 
                     return GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push(
+                      onTap: () {
+                        Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => FoodDetailScreen(data: data),
                           ),
                         );
-
-                        if (result != null && result is Map<String, dynamic>) {
-                          setState(() {
-                            cart.add(result);
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("${result['name']} added to cart ✅"),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        }
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -633,9 +614,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       InkWell(
                                         onTap: () {
-                                          setState(() {
-                                            cart.add(data);
-                                          });
+                                          context.read<CartProvider>().addItem(data);
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(

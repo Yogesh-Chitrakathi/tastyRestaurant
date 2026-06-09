@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/login_screen.dart';
 import '../home/home_screen.dart';
 
@@ -16,15 +17,23 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 3), () async {
       final user = FirebaseAuth.instance.currentUser;
+      final sbUser = Supabase.instance.client.auth.currentUser;
 
-      if (user != null) {
+      if (user != null && sbUser != null) {
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
+        // Clear state if they are out of sync
+        try {
+          await FirebaseAuth.instance.signOut();
+          await Supabase.instance.client.auth.signOut();
+        } catch (_) {}
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),

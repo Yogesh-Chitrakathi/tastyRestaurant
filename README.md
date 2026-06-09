@@ -62,8 +62,8 @@ Declared in `android/app/src/main/AndroidManifest.xml`:
 ### 🌐 Web Redirection (`web/redirect.html`)
 Contains a responsive Javascript controller to:
 *   Automatically extract the `id` from incoming query parameters.
-*   Detect the user's OS and attempt a custom intent link: `intent://product?id=...#Intent;scheme=tastyrestaurant;package=com.example.tastyRestaurant2;S.browser_fallback_url=https://devnectar.in/;end`.
-*   Provide a fallback redirection to the official website (`https://devnectar.in/`) if the mobile app is not installed.
+*   Detect the user's OS and attempt a custom intent link: `intent://product?id=...#Intent;scheme=tastyrestaurant;package=com.example.tastyRestaurant2;S.browser_fallback_url=https://tastyrestaurant.com/;end`.
+*   Provide a fallback redirection to the official website (`https://tastyrestaurant.com/`) if the mobile app is not installed.
 
 ---
 

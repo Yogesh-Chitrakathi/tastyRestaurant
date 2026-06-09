@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:provider/provider.dart';
+import '../../providers/cart_provider.dart';
 
 class FoodDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -80,10 +82,25 @@ class FoodDetailScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     onPressed: () {
-                      Navigator.pop(context, data);
+                      context.read<CartProvider>().addItem(data);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("${data['name']} added to cart! ✅"),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
                     },
-                    child: const Text("Add to Cart"),
+                    child: const Text(
+                      "Add to Cart",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],

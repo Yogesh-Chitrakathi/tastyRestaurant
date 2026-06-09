@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../core/utils/location_service.dart';
 
 class RestaurantRegisterScreen extends StatefulWidget {
@@ -139,7 +140,7 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
         return;
       }
 
-      /// 🔵 EMAIL + AUTH CREATE
+      /// 🔵 EMAIL + AUTH CREATE (Firebase)
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: email.text.trim(),
@@ -148,7 +149,15 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
 
       String uid = userCredential.user!.uid;
 
-      /// 🟢 SAVE DATA
+      /// 🔵 EMAIL + AUTH CREATE (Supabase)
+      final sb.AuthResponse supabaseResponse = await sb.Supabase.instance.client.auth.signUp(
+        email: email.text.trim(),
+        password: password.text.trim(),
+      );
+      final supabaseUser = supabaseResponse.user;
+      final String? supabaseUid = supabaseUser?.id;
+
+      /// 🟢 SAVE DATA (Firestore)
       await FirebaseFirestore.instance.collection("users").doc(uid).set({
         "fullName": fullName.text.trim(),
         "email": email.text.trim(),
@@ -174,6 +183,32 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
         "createdAt": DateTime.now(),
       });
 
+      /// 🟢 SAVE DATA (Supabase PostgreSQL)
+      if (supabaseUid != null) {
+        await sb.Supabase.instance.client.from('users').insert({
+          "id": supabaseUid,
+          "full_name": fullName.text.trim(),
+          "email": email.text.trim(),
+          "phone": phone.text.trim(),
+          "gender": gender,
+          "interests": interests.entries
+              .where((e) => e.value)
+              .map((e) => e.key)
+              .toList(),
+          "house": house.text.trim(),
+          "street": street.text.trim(),
+          "area": area.text.trim(),
+          "city": city.text.trim(),
+          "state": stateName.text.trim(),
+          "pincode": pincode.text.trim(),
+          "landmark": landmark.text.trim(),
+          "live_location": locationController.text.trim(),
+          "latitude": latitudeController.text.trim(),
+          "longitude": longitudeController.text.trim(),
+          "use_for_delivery": useForDelivery,
+        });
+      }
+
       /// ✅ SUCCESS
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -196,6 +231,14 @@ class _RestaurantRegisterScreenState extends State<RestaurantRegisterScreen> {
       } else {
         showMsg("Registration failed ❌");
       }
+    }
+    /// ❌ SUPABASE ERRORS
+    on sb.AuthException catch (e) {
+      showMsg("Supabase Auth Error: ${e.message} ❌");
+      // Clean up Firebase Auth user if Supabase signup failed
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } catch (_) {}
     } catch (e) {
       showMsg("Something went wrong ❌");
     }

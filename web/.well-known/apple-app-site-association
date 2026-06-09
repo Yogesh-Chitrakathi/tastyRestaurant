@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "YOUR_APPLE_DEVELOPER_TEAM_ID.com.example.tastyRestaurant2",
+        "appID": "742B29B7.com.example.tastyRestaurant2",
         "paths": [
           "/app/*"
         ]

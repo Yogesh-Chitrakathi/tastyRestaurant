@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../home/home_screen.dart';
 import 'registration_screen.dart';
 
@@ -43,7 +44,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
+      // 1. Firebase Login
       await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.text.trim(),
+        password: pass.text.trim(),
+      );
+
+      // 2. Supabase Login
+      await sb.Supabase.instance.client.auth.signInWithPassword(
         email: email.text.trim(),
         password: pass.text.trim(),
       );
@@ -77,6 +85,16 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       showMsg(message);
+    } on sb.AuthException catch (e) {
+      setState(() => isLoading = false);
+      // Clean up/Sign out from Firebase if Supabase fails to keep state aligned
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      showMsg("Supabase Login Error: ${e.message}");
+    } catch (e) {
+      setState(() => isLoading = false);
+      showMsg("Something went wrong");
     }
   }
 
